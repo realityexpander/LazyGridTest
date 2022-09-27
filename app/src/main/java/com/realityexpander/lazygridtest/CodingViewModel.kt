@@ -172,7 +172,7 @@ class CodingRepository {
 //                }
 //            }
 
-//            // using iterator - remove & add, even w/ synchronized, causes CME
+//            // using iterator - remove & add, even w/ `synchronized`, causes CME
 //            synchronized(data) {
 //                val iterator = data.iterator()
 //                while (iterator.hasNext()) {
