@@ -1,5 +1,7 @@
 package com.realityexpander.lazygridtest
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
@@ -38,11 +40,11 @@ class CodingViewModel(
     suspend fun startSim() = viewModelScope.launch {
         codingRepository.startSimulation()
     }
-
-
 }
 
 class CodingRepository {
+    private var isSimRunning: Boolean = false
+
     private val data: SnapshotStateList<Coding> = CodingType.values()
         .map {
             // `with` changes `it` to `this`
@@ -59,6 +61,13 @@ class CodingRepository {
         .toMutableStateList()
 
     fun getCoding(): Flow<List<Coding>> = snapshotFlow {
+
+//        // prevents ConcurrentModificationException (copy trick)
+//        val copy = data.map {
+//            it.copy()
+//        }
+//        copy.toList()
+
         data.toList()
     }
 
@@ -73,28 +82,92 @@ class CodingRepository {
     }
 
     suspend fun startSimulation() = withContext(Dispatchers.IO) {
+        if(isSimRunning) return@withContext
+
+        isSimRunning = true
         repeat(1000) {
+
+//            // Does not update the UI (requires an update function, below)
+//            data.forEach { coding ->
+//                coding.share += abs(Random.nextInt()) % 10
+//                coding.trend = abs(Random.nextInt()) % 300
+//            }
+
+//            // Does not update the UI
+//            data.forEachIndexed { i, coding ->
+//                coding.share += abs(Random.nextInt()) % 10
+//                coding.trend = abs(Random.nextInt()) % 300
+//            }
+
+//            // Causes ConcurrentModificationException
+//            data.forEachIndexed { index, coding ->
+//                data[index] = coding.copy(
+//                    share = coding.share + abs(Random.nextInt()) % 10,
+//                    trend = abs(Random.nextInt()) % 300
+//                )
+//            }
+
+//            data[0] = data[0].copy(share = data[0].share) // does not update UI
+
+            // Update function
+//            //data.reverse() // causes crash
+//            //data.sortBy { it.share } // updates the list
+//            data.add(data.removeAt(0)) // forces update (best) (no copy trick)
+
+
             for(index in data.indices) {
+//                // Causes ConcurrentModificationException without copy trick
 //                data[index] = with(data[index]) {
-//                    copy(share = share + trend,
-//                        trend = trend + Random.nextInt(-10, 10)
+//                    copy(
+//                        share = share + trend,
+//                        trend = trend + Random.nextInt(0, 10)
 //                    )
 //                }
 
-                data[index] = data[index].copy(
-                    share = data[index].share + data[index].trend,
-                    trend = data[index].trend + abs(Random.nextInt()) % 50
-                )
+//                // Causes ConcurrentModificationException without copy trick
+//                data[index] = data[index].copy(
+//                    share = data[index].share + data[index].trend,
+//                    trend = data[index].trend + abs(Random.nextInt()) % 50
+//                )
 
+//                // Simply modifying the items Does not update the UI
+//                data[index].share = data[index].share + data[index].trend
+//                data[index].trend = data[index].trend + abs(Random.nextInt()) % 50
+
+//                // This causes CME (without copy trick)
+//                //data.add(data.removeAt(index)) // forces update on every item changed (needs copy trick)
             }
+//            data.add(data.removeAt(0)) // forces update (needs copy trick)
 
-            delay(500)
+//            // Causes ConcurrentModificationException without copy trick
+//            data.replaceAll {
+//                it.copy(
+//                    share = it.share + it.trend,
+//                    trend = it.trend + abs(Random.nextInt()) % 50
+//                )
+//            }
+
+//            // using iterator - causes ConcurrentModificationException without copy trick
+//            val itr = data.listIterator()
+//            while(itr.hasNext()) {
+//                val coding = itr.next()
+//                itr.set(coding.copy(
+//                    share = coding.share + coding.trend,
+//                    trend = coding.trend + abs(Random.nextInt()) % 50
+//                ))
+//            }
+
+            delay(10)
+
             println("data: ${data
                 .sortedBy { it.share }
-                .subList(1,10)
+                .reversed()
+                .subList(0,10)
                 .joinToString { it.name + "->" + it.share } 
             }")
         }
+
+        isSimRunning = false
     }
 }
 
