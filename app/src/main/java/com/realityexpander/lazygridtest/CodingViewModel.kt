@@ -14,6 +14,12 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.abs
 import kotlin.random.Random
 
+// ConcurrentModificationException resources
+// https://stackoverflow.com/questions/39479909/synchronize-methods-to-prevent-concurrentmodificationexception
+// https://stackoverflow.com/questions/5151956/java-util-concurrentmodificationexception-in-android-animation
+// https://stackoverflow.com/questions/67827951/android-compose-lazycolum-rendering-issue-when-changing-list-sorting
+//
+
 @OptIn(InternalCoroutinesApi::class)
 class CodingViewModel(
     private val codingRepository: CodingRepository = CodingRepository()
@@ -68,6 +74,7 @@ class CodingRepository {
 
     fun getCoding(): Flow<List<Coding>> = snapshotFlow {
 
+//        // works
 //        var list: ArrayList<Coding>
 //        synchronized(data) {
 //            list = ArrayList(data.toList())
@@ -75,6 +82,7 @@ class CodingRepository {
 //        list
 
 
+//        // works
 //        val data2 = CopyOnWriteArrayList<Coding>()
 //        synchronized(data) {
 //            data.forEach(data2::add)
@@ -82,6 +90,7 @@ class CodingRepository {
 //        data2
 
 
+        // works and simplest
         synchronized(data) {
             data.toList()
         }
@@ -167,7 +176,7 @@ class CodingRepository {
             //////////////// WORKS ///////////////////////
 
 //            // works, but requires the force update hack
-              // Doesn't need synchronized for AnimatedVerticalGrid, LazyColumn
+//            // Doesn't need synchronized for AnimatedVerticalGrid, LazyColumn
 //            synchronized(data) { // needed for LazyVerticalGrid
                 data.forEach { coding ->
                     coding.share += coding.trend
@@ -194,7 +203,7 @@ class CodingRepository {
 //            //}
 
 
-            // works well - - doesn't need synchronized on AnimatedVerticalGrid, LazyVerticalGrid
+//            // works well - - doesn't need synchronized on AnimatedVerticalGrid, LazyVerticalGrid
 //            synchronized(data) { // needed for LazyColumn with AnimatedItemPlacement
 //                for (index in data.indices) {
 //                    data[index] = with(data[index]) {
@@ -211,13 +220,13 @@ class CodingRepository {
 
             delay(Random.nextLong(10, 500))
 
-//            println("data: ${
-//                data
-//                    .sortedBy { it.share }
-//                    .reversed()
-//                    .subList(0, 10)
-//                    .joinToString { it.name + "->" + it.share }
-//            }")
+            println("data: ${
+                data
+                    .sortedBy { it.share }
+                    .reversed()
+                    .subList(0, 10)
+                    .joinToString { it.name + "->" + it.share }
+            }")
         }
 
         isSimRunning = false
