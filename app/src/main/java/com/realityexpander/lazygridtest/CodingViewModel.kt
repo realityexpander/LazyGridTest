@@ -162,7 +162,7 @@ class CodingRepository {
 //              data[index].trend = data[index].trend + abs(Random.nextInt()) % 50
 
 
-//            // Causes ConcurrentModificationException & requires synchronized VERSION_CODE N
+//            // Causes ConcurrentModificationException & requires `synchronized`, requires Build VERSION_CODE N
 //            synchronized(data) {
 //                data.replaceAll {
 //                    it.copy(
