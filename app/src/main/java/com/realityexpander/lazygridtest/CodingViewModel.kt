@@ -195,7 +195,7 @@ class CodingRepository {
                     coding.trend = abs(Random.nextInt()) % 50
                 }
 
-                // forces update on each item (but interferes with animation)
+                // forces update
                 data.add(data.removeAt(0))
 //            }
 
