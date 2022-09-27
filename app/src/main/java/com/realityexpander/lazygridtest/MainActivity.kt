@@ -37,16 +37,9 @@ class MainActivity : ComponentActivity() {
 
                 val scope = rememberCoroutineScope()
 
-//                LaunchedEffect(uiState.value.data) {
-//                    snapshotFlow { uiState.value.data}
-//                        .distinctUntilChanged()
-//                        .collect {
-//                            listState.animateScrollToItem(0)
-//                        }
-//                }
 
                 val itemsSorted = uiState.value.data
-                    ?.map { it.copy() }
+                    ?.map { it } //.copy() }
                     ?.sortedBy {
                         it.share
                     }
@@ -58,87 +51,135 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-//                    LazyVerticalGrid(
-//                        cells = GridCells.Fixed(2),
-//                        state = listState,
-//                    ) {
-//                        items(itemsSorted) { item ->
-//                            Row {
-//                                Text(text = item.name +":"+ item.share,
-//                                    modifier = Modifier.animateItemPlacement())
-//                            }
-//                        }
 
-//                    LazyColumn() {
-//                        items(
-//                            //itemsSorted,
-//                            uiState.value.data ?: emptyList(),
-//                            key= { item -> item.id },
-//                        ) { item ->
-//                            Text(text = item.name +":"+ item.share,
-//                                modifier = Modifier.animateItemPlacement()
-//                            )
-//                        }
-
-
-//                        item {
-//                            Button(onClick = {
-//                                scope.launch {
-//                                    viewModel.startSim()
-//                                }
-//                            }) {
-//                                Text(text = "Start Sim")
-//                            }
-//                        }
-//                    }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.White)
-                    ) {
-                        AnimatedVerticalGrid(
-                            items = itemsSorted,
-                            itemKey = Coding::id,
-                            columns = 2,
-                            rows = itemsSorted.size / 2,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1F)
-                        ) { item ->
-                            //Coding(it.id)
-                            Text(
-                                text = item.name + ":" + item.share,
-                                color = Color.Black,
-                                modifier = Modifier.
-                                    background(color = Color(item.color))
-                                    .padding(8.dp)
-                            )
-                        }
-
-                        Button(onClick = {
-                            scope.launch {
-                                viewModel.startSim()
+                    // LazyVerticalGrid
+                    if (false) {
+                        LazyVerticalGrid(
+                            cells = GridCells.Fixed(2),
+                        ) {
+                            items(itemsSorted) { item ->
+                                Row {
+                                    Text(
+                                        text = item.name + ":" + item.share,
+                                        modifier = Modifier.animateItemPlacement(),
+                                        color = MaterialTheme.colors.onBackground
+                                    )
+                                }
                             }
-                        }) {
-                            Text(text = "Start Sim")
+                            item {
+                                Button(onClick = {
+                                    scope.launch {
+                                        viewModel.startSim()
+                                    }
+                                }) {
+                                    Text(text = "Start Sim")
+                                }
+
+                                Button(onClick = {
+                                    scope.launch {
+                                        viewModel.stopSim()
+                                    }
+                                }) {
+                                    Text(text = "Stop Sim")
+                                }
+                            }
+                        }
+                    }
+
+
+                    // LazyColumn
+                    if (true) {
+                        LazyColumn() {
+                            items(
+                                itemsSorted,
+                                //uiState.value.data ?: emptyList(),
+                                key = { item -> item.id },
+                            ) { item ->
+                                Text(
+                                    text = item.name + ":" + item.share,
+                                    modifier = Modifier.animateItemPlacement(),
+                                    color = MaterialTheme.colors.onBackground
+                                )
+                            }
+
+                            item {
+                                Button(onClick = {
+                                    scope.launch {
+                                        viewModel.startSim()
+                                    }
+                                }) {
+                                    Text(text = "Start Sim")
+                                }
+
+                                Button(onClick = {
+                                    scope.launch {
+                                        viewModel.stopSim()
+                                    }
+                                }) {
+                                    Text(text = "Stop Sim")
+                                }
+                            }
+                        }
+                    }
+
+                    // AnimatedVerticalGrid
+                    if (false) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.White)
+                        ) {
+                            AnimatedVerticalGrid(
+                                items = itemsSorted,
+                                itemKey = Coding::id,
+                                columns = 2,
+                                rows = itemsSorted.size / 2,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1F)
+                            ) { item ->
+                                //Coding(it.id)
+                                Text(
+                                    text = item.name + ":" + item.share,
+                                    color = Color.Black,
+                                    modifier = Modifier
+                                        .background(color = Color(item.color))
+                                        .padding(8.dp)
+                                )
+                            }
+
+                            Button(onClick = {
+                                scope.launch {
+                                    viewModel.startSim()
+                                }
+                            }) {
+                                Text(text = "Start Sim")
+                            }
+
+                            Button(onClick = {
+                                scope.launch {
+                                    viewModel.stopSim()
+                                }
+                            }) {
+                                Text(text = "Stop Sim")
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
 
-    @Composable
-    fun Greeting(name: String) {
-        Text(text = "Hello $name!")
-    }
+@Composable
+fun Greeting(name: String) {
+    Text(text = "Hello $name!")
+}
 
-    @Preview(showBackground = true)
-    @Composable
-    fun DefaultPreview() {
-        LazyGridTestTheme {
-            Greeting("Android")
-        }
+@Preview(showBackground = true)
+@Composable
+fun DefaultPreview() {
+    LazyGridTestTheme {
+        Greeting("Android")
     }
 }

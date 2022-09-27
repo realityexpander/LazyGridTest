@@ -1,5 +1,7 @@
 package com.realityexpander.lazygridtest
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
@@ -40,6 +42,10 @@ class CodingViewModel(
     suspend fun startSim() = viewModelScope.launch {
         codingRepository.startSimulation()
     }
+
+    suspend fun stopSim() = viewModelScope.launch {
+        codingRepository.stopSimulation()
+    }
 }
 
 class CodingRepository {
@@ -62,39 +68,23 @@ class CodingRepository {
 
     fun getCoding(): Flow<List<Coding>> = snapshotFlow {
 
-        // prevents ConcurrentModificationException (copy trick)
-//        val copy = mutableListOf<Coding>()
-//        data.forEach {
-//            copy.add(it.copy())
-//        }
-
-//        val copy = data.map {
-//            it.copy()
-//        }
-//        copy.toList()
-
-//        synchronized(data) {
-//            data.map {
-//                it.copy()
-//            }.toList()
-//        }
-
 //        var list: ArrayList<Coding>
 //        synchronized(data) {
 //            list = ArrayList(data.toList())
 //        }
 //        list
 
-        // Super fast
-        val data2 = CopyOnWriteArrayList<Coding>()
-        synchronized(data) {
-            data.forEach(data2::add)
-        }
-        data2
 
+//        val data2 = CopyOnWriteArrayList<Coding>()
 //        synchronized(data) {
-//            data.toList()
+//            data.forEach(data2::add)
 //        }
+//        data2
+
+
+        synchronized(data) {
+            data.toList()
+        }
     }
 
     fun addCoding(coding: Coding): Boolean {
@@ -107,95 +97,127 @@ class CodingRepository {
         return true
     }
 
+    suspend fun stopSimulation() {
+        isSimRunning = false
+    }
+
     suspend fun startSimulation() = withContext(Dispatchers.IO) {
         if (isSimRunning) return@withContext
 
         isSimRunning = true
         repeat(1000) {
 
-//            // Does not update the UI (requires an update function, below)
-//            data.forEach { coding ->
-//                coding.share += abs(Random.nextInt()) % 10
-//                coding.trend = abs(Random.nextInt()) % 300
+            if (!isSimRunning) return@repeat
+
+            ///////////// DOESNT WORK /////////////
+
+//            // Causes ConcurrentModificationException (cant use forEachIndexed)
+//            synchronized(data) {
+//                data.forEachIndexed { index, coding ->
+//                    data[index] = coding.copy(
+//                        share = coding.share + coding.trend,
+//                        trend = abs(Random.nextInt()) % 300
+//                    )
+//                }
 //            }
 
-//            // Does not update the UI
-//            data.forEachIndexed { i, coding ->
-//                coding.share += abs(Random.nextInt()) % 10
-//                coding.trend = abs(Random.nextInt()) % 300
+//            // Causes ConcurrentModificationException (cant use forEach)
+//            synchronized(data) {
+//                data.forEach { coding ->
+//                    data.remove(coding)
+//                    data.add(coding.copy(
+//                        share = coding.share + coding.trend,
+//                        trend = abs(Random.nextInt()) % 300
+//                    ))
+//                }
 //            }
 
-//            // Causes ConcurrentModificationException
-//            data.forEachIndexed { index, coding ->
-//                data[index] = coding.copy(
-//                    share = coding.share + abs(Random.nextInt()) % 10,
-//                    trend = abs(Random.nextInt()) % 300
-//                )
+
+//            // Does NOT update the UI (requires an update function, below)
+//            data[0] = data[0].copy(share = data[0].share)
+
+//              // Simply modifying the items Does NOT update the UI
+//              data[index].share = data[index].share + data[index].trend
+//              data[index].trend = data[index].trend + abs(Random.nextInt()) % 50
+
+
+//            // Causes ConcurrentModificationException & requires synchronized VERSION_CODE N
+//            synchronized(data) {
+//                data.replaceAll {
+//                    it.copy(
+//                        share = it.share + it.trend,
+//                        trend = it.trend + abs(Random.nextInt()) % 50
+//                    )
+//                }
 //            }
 
-//            data[0] = data[0].copy(share = data[0].share) // does not update UI
+//            // using iterator - remove & add, even w/ synchronized, causes CME
+//            synchronized(data) {
+//                val iterator = data.iterator()
+//                while (iterator.hasNext()) {
+//                    val coding = iterator.next()
+//                    iterator.remove()
+//                    data.add(coding.copy(
+//                        share = coding.share + coding.trend,
+//                        trend = coding.trend + abs(Random.nextInt()) % 50
+//                    ))
+//                }
+//            }
 
-            // Update function
-//            //data.reverse() // causes crash
-//            //data.sortBy { it.share } // updates the list
-//            data.add(data.removeAt(0)) // forces update (best) (no copy trick)
+            //////////////// WORKS ///////////////////////
 
-
-            synchronized(data) {
-                for (index in data.indices) {
-                    data[index] = with(data[index]) {
-                        val randomInt = abs(Random.nextInt()) % 10
-                        copy(
-                            share = share + trend,
-                            trend = trend + randomInt
-                        )
-                    }
-
+//            // works, but requires the force update hack
+              // Doesn't need synchronized for AnimatedVerticalGrid, LazyColumn
+//            synchronized(data) { // needed for LazyVerticalGrid
+                data.forEach { coding ->
+                    coding.share += coding.trend
+                    coding.trend = abs(Random.nextInt()) % 50
                 }
-            }
 
-//                // Causes ConcurrentModificationException without copy trick
-//                data[index] = data[index].copy(
-//                    share = data[index].share + data[index].trend,
-//                    trend = data[index].trend + abs(Random.nextInt()) % 50
-//                )
-
-//                // Simply modifying the items Does not update the UI
-//                data[index].share = data[index].share + data[index].trend
-//                data[index].trend = data[index].trend + abs(Random.nextInt()) % 50
-
-//                // This causes CME (without copy trick)
-//                //data.add(data.removeAt(index)) // forces update on every item changed (needs copy trick)
-//            }
-//            data.add(data.removeAt(0)) // forces update (needs copy trick)
-
-//            // Causes ConcurrentModificationException without copy trick
-//            data.replaceAll {
-//                it.copy(
-//                    share = it.share + it.trend,
-//                    trend = it.trend + abs(Random.nextInt()) % 50
-//                )
-//            }
-
-//            // using iterator - causes ConcurrentModificationException without copy trick
-//            val itr = data.listIterator()
-//            while(itr.hasNext()) {
-//                val coding = itr.next()
-//                itr.set(coding.copy(
-//                    share = coding.share + coding.trend,
-//                    trend = coding.trend + abs(Random.nextInt()) % 50
-//                ))
+                // forces update on each item (but interferes with animation)
+                data.add(data.removeAt(0))
 //            }
 
 
-            delay(50)
+//            // Works well - doesn't need synchronized on AnimatedVerticalGrid, LazyVerticalGrid
+//            //synchronized(data) { // needed for LazyColumn with AnimatedItemPlacement
+//                val itr = data.listIterator()
+//                while (itr.hasNext()) {
+//                    val coding = itr.next()
+//                    itr.set(
+//                        coding.copy(
+//                            share = coding.share + coding.trend,
+//                            trend = coding.trend + abs(Random.nextInt()) % 50
+//                        )
+//                    )
+//                }
+//            //}
 
-            println("data: ${data
-                .sortedBy { it.share }
-                .reversed()
-                .subList(0,10)
-                .joinToString { it.name + "->" + it.share }
-            }")
+
+            // works well - - doesn't need synchronized on AnimatedVerticalGrid, LazyVerticalGrid
+//            synchronized(data) { // needed for LazyColumn with AnimatedItemPlacement
+//                for (index in data.indices) {
+//                    data[index] = with(data[index]) {
+//                        val randomInt = abs(Random.nextInt()) % 10
+//                        copy(
+//                            share = share + trend,
+//                            trend = trend + randomInt
+//                        )
+//                    }
+//
+//                }
+//            }
+
+
+            delay(Random.nextLong(10, 500))
+
+//            println("data: ${
+//                data
+//                    .sortedBy { it.share }
+//                    .reversed()
+//                    .subList(0, 10)
+//                    .joinToString { it.name + "->" + it.share }
+//            }")
         }
 
         isSimRunning = false
@@ -207,8 +229,8 @@ data class Coding(
     val id: Int = 0,
     val name: String = "",
     val description: String = "",
-    val share: Int = 0,
-    val trend: Int = 0,
+    var share: Int = 0,
+    var trend: Int = 0,
     val color: Long = Random(id).nextLong() //and 0xBB000000
 )
 
