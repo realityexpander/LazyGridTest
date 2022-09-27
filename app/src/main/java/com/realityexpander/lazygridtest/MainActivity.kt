@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
 
 
+                // Sort the list in the UI
                 val itemsSorted = uiState.value.data
                     ?.map { it } //.copy() }
                     ?.sortedBy {

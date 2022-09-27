@@ -18,7 +18,17 @@ import kotlin.random.Random
 // https://stackoverflow.com/questions/39479909/synchronize-methods-to-prevent-concurrentmodificationexception
 // https://stackoverflow.com/questions/5151956/java-util-concurrentmodificationexception-in-android-animation
 // https://stackoverflow.com/questions/67827951/android-compose-lazycolum-rendering-issue-when-changing-list-sorting
-//
+// https://stackoverflow.com/questions/70457309/modifying-a-snapshotstatelist-throws-concurrentmodificationexception
+// https://stackoverflow.com/questions/6866238/concurrent-modification-exception-adding-to-an-arraylist
+
+// Youtube that started this project
+// https://www.youtube.com/watch?v=RPpXYxwo2yI&t=11s
+
+// Source code to SnapShotStateList
+// https://androidx.tech/artifacts/compose.runtime/runtime/1.0.0-alpha06-source/androidx/compose/runtime/snapshots/SnapshotStateList.kt.html
+
+// About SnapShotFlow
+// https://medium.com/mobile-app-development-publication/jetpack-compose-side-effects-made-easy-a4867f876928
 
 @OptIn(InternalCoroutinesApi::class)
 class CodingViewModel(
@@ -32,6 +42,7 @@ class CodingViewModel(
         viewModelScope.launch {
             codingRepository.getCoding().collect { listCoding ->
 
+//                 // Sort the list in the viewModel vs in the UI
 //                 _uiState.value = Response.Success(
 //                     listCoding.sortedBy { it.share }.reversed()
 //                 )
@@ -71,6 +82,7 @@ class CodingRepository {
             }
         }
         .toMutableStateList()
+        .also {} // to show inline hint about type
 
     fun getCoding(): Flow<List<Coding>> = snapshotFlow {
 
@@ -175,8 +187,8 @@ class CodingRepository {
 
             //////////////// WORKS ///////////////////////
 
-//            // works, but requires the force update hack
-//            // Doesn't need synchronized for AnimatedVerticalGrid, LazyColumn
+//            // Works, but requires the force update hack
+//            // Doesn't need `synchronized` for `AnimatedVerticalGrid`, `LazyColumn`
 //            synchronized(data) { // needed for LazyVerticalGrid
                 data.forEach { coding ->
                     coding.share += coding.trend
@@ -188,8 +200,8 @@ class CodingRepository {
 //            }
 
 
-//            // Works well - doesn't need synchronized on AnimatedVerticalGrid, LazyVerticalGrid
-//            //synchronized(data) { // needed for LazyColumn with AnimatedItemPlacement
+//            // Works well - doesn't need `synchronized` on `AnimatedVerticalGrid`, `LazyVerticalGrid`
+//            //synchronized(data) { // needed for `LazyColumn` with `AnimatedItemPlacement`
 //                val itr = data.listIterator()
 //                while (itr.hasNext()) {
 //                    val coding = itr.next()
@@ -203,8 +215,8 @@ class CodingRepository {
 //            //}
 
 
-//            // works well - - doesn't need synchronized on AnimatedVerticalGrid, LazyVerticalGrid
-//            synchronized(data) { // needed for LazyColumn with AnimatedItemPlacement
+//            // works well - doesn't need `synchronized` on `AnimatedVerticalGrid`, `LazyVerticalGrid`
+//            synchronized(data) { // needed for `LazyColumn` with `AnimatedItemPlacement`
 //                for (index in data.indices) {
 //                    data[index] = with(data[index]) {
 //                        val randomInt = abs(Random.nextInt()) % 10
@@ -240,7 +252,7 @@ data class Coding(
     val description: String = "",
     var share: Int = 0,
     var trend: Int = 0,
-    val color: Long = Random(id).nextLong() //and 0xBB000000
+    val color: Long = Random(id).nextLong()
 )
 
 enum class CodingType(
