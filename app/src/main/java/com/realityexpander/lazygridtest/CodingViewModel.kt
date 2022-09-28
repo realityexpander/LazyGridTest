@@ -1,5 +1,6 @@
 package com.realityexpander.lazygridtest
 
+import android.annotation.SuppressLint
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.snapshotFlow
@@ -122,11 +123,12 @@ class CodingRepository {
         isSimRunning = false
     }
 
+    @SuppressLint("SuspiciousIndentation")
     suspend fun startSimulation() = withContext(Dispatchers.IO) {
         if (isSimRunning) return@withContext
 
         isSimRunning = true
-        repeat(1000) {
+        repeat(100000) {
 
             if (!isSimRunning) return@repeat
 
