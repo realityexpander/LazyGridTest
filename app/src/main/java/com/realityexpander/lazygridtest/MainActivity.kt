@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.toColor
 import androidx.core.graphics.toColorLong
 import com.realityexpander.lazygridtest.ui.theme.LazyGridTestTheme
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -46,6 +47,21 @@ class MainActivity : ComponentActivity() {
                     }
                     ?.reversed()
                     ?: emptyList()
+
+
+                // Testing snapshotFlow (allows use of flow operators)
+                LaunchedEffect(key1 = uiState) {
+                    println("LaunchedEffect")
+
+                    // Create a flow from a Compose State
+                    snapshotFlow { uiState }
+                        .mapNotNull { it.value.data }
+                        .collect {
+                            it.forEach { item ->
+                                println("snapshotFlow item: ${item.name}")
+                            }
+                        }
+                }
 
                 // A surface container using the 'background' color from the theme
                 Surface(
