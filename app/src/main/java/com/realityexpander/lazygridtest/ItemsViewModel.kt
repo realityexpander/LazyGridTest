@@ -1,12 +1,10 @@
 package com.realityexpander.lazygridtest
 
-import android.annotation.SuppressLint
 import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -26,12 +24,11 @@ import kotlin.random.Random
 // About SnapShotFlow
 // https://medium.com/mobile-app-development-publication/jetpack-compose-side-effects-made-easy-a4867f876928
 
-@OptIn(InternalCoroutinesApi::class)
-class CodingViewModel(
-    private val codingRepository: CodingRepository = CodingRepository()
+class ItemsViewModel(
+    private val itemRepository: ItemRepository = ItemRepository()
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<Response<List<Coding>>>(Response.Loading())
+    private val _uiState = MutableStateFlow<Response<List<Item>>>(Response.Loading())
     val uiState = _uiState.asStateFlow()
 
     private val _updateSortTriggerState = MutableStateFlow(-1)
@@ -41,30 +38,33 @@ class CodingViewModel(
     val updateValuesTriggerState = _updateValuesTriggerState.asStateFlow()
 
     init {
+        // Update the current list of data
         viewModelScope.launch {
-            codingRepository
-                .getCodingData()
-                .also {
+            itemRepository
+                .getItemsData()
+                .also {// to show inline hint about type
                 }
                 .collect { listCoding ->
                     _uiState.value = Response.Success(listCoding)
                 }
         }
 
+        // Update the sorted list  (usually slowly)
         viewModelScope.launch {
-            codingRepository
-                .getUpdateSortedTrigger()
-                .also {
+            itemRepository
+                .onUpdateSortedTrigger()
+                .also {// to show inline hint about type
                 }
                 .collect { updateSortKey ->
                     _updateSortTriggerState.value = updateSortKey
                 }
         }
 
+        // Update just the `share` values (usually rapidly)
         viewModelScope.launch {
-            codingRepository
-                .getUpdateValuesTrigger()
-                .also {
+            itemRepository
+                .onUpdateValuesTrigger()
+                .also { // to show inline hint about type
                 }
                 .collect { updateValuesKey ->
                     _updateValuesTriggerState.value = updateValuesKey
@@ -72,65 +72,26 @@ class CodingViewModel(
         }
     }
 
-    fun addCoding(coding: Coding): Boolean = codingRepository.addCoding(coding)
-    fun removeCoding(coding: Coding): Boolean = codingRepository.removeCoding(coding)
+    fun addItem(item: Item): Boolean = itemRepository.addCoding(item)
+    fun removeItem(item: Item): Boolean = itemRepository.removeCoding(item)
+
     suspend fun startSim() = viewModelScope.launch {
-        codingRepository.startSimulation()
+        itemRepository.startSimulation()
     }
 
     suspend fun stopSim() = viewModelScope.launch {
-        codingRepository.stopSimulation()
+        itemRepository.stopSimulation()
     }
 }
 
-class CodingRepository {
+class ItemRepository {
     private var isSimRunning: Boolean = false
-
-    //    // Using CopyOnWriteArrayList to avoid ConcurrentModificationException
-//    private val codingsWithCopyOnWriteArrayList = CopyOnWriteArrayList(
-//        CodingType.values().map {
-//            Coding(it, forceUpdateId = -1)
-//        }
-//    )
-//
-//    // Using regular ArrayList (must use `synchronized` to avoid ConcurrentModificationException)
-//    private val codingsRegularArray = ArrayList(
-//        CodingType.values().map {
-//            Coding(it, forceUpdateId = -1)
-//        }
-//    )
-//
-//    // Using regular array/list must use `synchronized` or `withLock`
-//    private val dataWithoutCopyOnWrite = CodingType.values()
-////    private val data = CodingType.values()
-//        .map {
-//            // `with` changes `it` to `this`
-//            with(it) {
-//                Coding(
-//                    it.id,
-//                    this.languageName,
-//                    this.description,
-//                    0,
-//                    abs(Random.nextInt()) % 300
-//                )
-//            }
-//        }
-//        .toMutableStateList()
-//        .also {// to show inline hint about type
-//        }
-//
-//    // Using CopyOnWriteArrayList - removes the need to use `synchronized` or `withLock`
-//    private val dataUsingCopyOnWriteArrayList = codingsWithCopyOnWriteArrayList
-////    private val data = codingsWithCopyOnWriteArrayList
-//        .toMutableStateList()
-//        .also {// to show inline hint about type
-//        }
 
     // Setup Data for items
     private val data =
         ArrayList(
-            CodingType.values().map {
-                Coding(it, forceUpdateId = -1)
+            ItemListEnum.values().map {
+                Item(it)
             }
         )
         .toMutableStateList()
@@ -138,29 +99,29 @@ class CodingRepository {
         }
 
 
-    fun getCodingData(): Flow<List<Coding>> = snapshotFlow {
+    fun getItemsData(): Flow<List<Item>> = snapshotFlow {
         data
     }
 
     private var updateSortTrigger: Int by mutableStateOf(-1)
-    fun getUpdateSortedTrigger() =
+    fun onUpdateSortedTrigger() =
         snapshotFlow {
             updateSortTrigger
         }
 
     private var updateValuesTrigger by mutableStateOf(-1)
-    fun getUpdateValuesTrigger() =
+    fun onUpdateValuesTrigger() =
         snapshotFlow {
             updateValuesTrigger
         }
 
-    fun addCoding(coding: Coding): Boolean {
-        data.add(coding)
+    fun addCoding(item: Item): Boolean {
+        data.add(item)
         return true
     }
 
-    fun removeCoding(coding: Coding): Boolean {
-        data.remove(coding)
+    fun removeCoding(item: Item): Boolean {
+        data.remove(item)
         return true
     }
 
@@ -182,11 +143,12 @@ class CodingRepository {
         isSimRunning = true
         var counter = 0
         var counter2 = 0
-        repeat(100_000) {
+        val maxReps = 100_000
 
+        repeat(maxReps) {
             if (!isSimRunning) return@repeat
 
-
+            // Run the simulation data
             data.forEach { coding ->
                 coding.share += coding.trend
                 coding.trend = abs(Random.nextInt()) % 50
@@ -194,7 +156,7 @@ class CodingRepository {
 
             // Update the values in the items in the UI
             counter2++
-            if (counter2 > 500) {
+            if (counter2 > 5) {
                 counter2 = 0
 
                 updateValuesTrigger = Random.nextInt()
@@ -202,26 +164,18 @@ class CodingRepository {
 
             // Update the sort order in the UI
             counter++
-            if (counter >= 100_000 / 5) {
+            if (counter >= maxReps / 5) {
                 counter = 0
 
                 updateSortTrigger = Random.nextInt()
             }
-
         }
+        isSimRunning = false
 
-//        val itr = data.listIterator()
-//        while (itr.hasNext()) {
-//            val coding = itr.next()
-//            itr.set(
-//                coding.copy(
-//                    forceUpdateId = abs(Random.nextInt())
-//                )
-//            )
-//        }
-
+        // Update the UI with final data
         updateValuesTrigger = Random.nextInt()
         updateSortTrigger = Random.nextInt()
+
 
         // Show final data in log
         val sorted = data
@@ -233,12 +187,11 @@ class CodingRepository {
             .joinToString { it.name + "->" + it.share }
         println("final data           : $sorted")
 
-        isSimRunning = false
     }
 }
 
 
-data class Coding(
+data class Item(
     val id: Int = 0,
     val name: String = "",
     val description: String = "",
@@ -247,17 +200,16 @@ data class Coding(
     val color: Long = Random(id).nextLong(),
     var forceUpdateId: Int = 0
 ) {
-    constructor(codingType: CodingType, forceUpdateId: Int = 0) : this(
-        codingType.id,
-        codingType.languageName,
-        codingType.description,
+    constructor(item: ItemListEnum) : this(
+        item.id,
+        item.languageName,
+        item.description,
         0,
         abs(Random.nextInt()) % 300,
-        forceUpdateId = forceUpdateId
     )
 }
 
-enum class CodingType(
+enum class ItemListEnum(
     val id: Int,
     val languageName: String,
     val description: String
