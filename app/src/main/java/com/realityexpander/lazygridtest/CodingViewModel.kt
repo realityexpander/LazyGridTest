@@ -86,49 +86,53 @@ class CodingViewModel(
 class CodingRepository {
     private var isSimRunning: Boolean = false
 
-    // Using CopyOnWriteArrayList to avoid ConcurrentModificationException
-    private val codingsWithCopyOnWriteArrayList = CopyOnWriteArrayList(
-        CodingType.values().map {
-            Coding(it, forceUpdateId = -1)
-        }
-    )
+    //    // Using CopyOnWriteArrayList to avoid ConcurrentModificationException
+//    private val codingsWithCopyOnWriteArrayList = CopyOnWriteArrayList(
+//        CodingType.values().map {
+//            Coding(it, forceUpdateId = -1)
+//        }
+//    )
+//
+//    // Using regular ArrayList (must use `synchronized` to avoid ConcurrentModificationException)
+//    private val codingsRegularArray = ArrayList(
+//        CodingType.values().map {
+//            Coding(it, forceUpdateId = -1)
+//        }
+//    )
+//
+//    // Using regular array/list must use `synchronized` or `withLock`
+//    private val dataWithoutCopyOnWrite = CodingType.values()
+////    private val data = CodingType.values()
+//        .map {
+//            // `with` changes `it` to `this`
+//            with(it) {
+//                Coding(
+//                    it.id,
+//                    this.languageName,
+//                    this.description,
+//                    0,
+//                    abs(Random.nextInt()) % 300
+//                )
+//            }
+//        }
+//        .toMutableStateList()
+//        .also {// to show inline hint about type
+//        }
+//
+//    // Using CopyOnWriteArrayList - removes the need to use `synchronized` or `withLock`
+//    private val dataUsingCopyOnWriteArrayList = codingsWithCopyOnWriteArrayList
+////    private val data = codingsWithCopyOnWriteArrayList
+//        .toMutableStateList()
+//        .also {// to show inline hint about type
+//        }
 
-    // Using regular ArrayList (must use `synchronized` to avoid ConcurrentModificationException)
-    private val codingsRegularArray = ArrayList(
-        CodingType.values().map {
-            Coding(it, forceUpdateId = -1)
-        }
-    )
-
-    // Using regular array/list must use `synchronized` or `withLock`
-    private val dataWithoutCopyOnWrite = CodingType.values()
-//    private val data = CodingType.values()
-        .map {
-            // `with` changes `it` to `this`
-            with(it) {
-                Coding(
-                    it.id,
-                    this.languageName,
-                    this.description,
-                    0,
-                    abs(Random.nextInt()) % 300
-                )
+    // Setup Data for items
+    private val data =
+        ArrayList(
+            CodingType.values().map {
+                Coding(it, forceUpdateId = -1)
             }
-        }
-        .toMutableStateList()
-        .also {// to show inline hint about type
-        }
-
-    // Using CopyOnWriteArrayList - removes the need to use `synchronized` or `withLock`
-    private val dataUsingCopyOnWriteArrayList = codingsWithCopyOnWriteArrayList
-//    private val data = codingsWithCopyOnWriteArrayList
-        .toMutableStateList()
-        .also {// to show inline hint about type
-        }
-
-    // Using RegularArray
-    private val dataRegularArray = codingsRegularArray
-    private val data = codingsRegularArray
+        )
         .toMutableStateList()
         .also {// to show inline hint about type
         }
@@ -141,16 +145,12 @@ class CodingRepository {
     private var updateSortTrigger: Int by mutableStateOf(-1)
     fun getUpdateSortedTrigger() =
         snapshotFlow {
-            //println("getUpdateSortedKey() called")
-
             updateSortTrigger
         }
 
     private var updateValuesTrigger by mutableStateOf(-1)
     fun getUpdateValuesTrigger() =
         snapshotFlow {
-            //println("getUpdateValuesKey() called")
-
             updateValuesTrigger
         }
 
@@ -176,7 +176,6 @@ class CodingRepository {
         updateSortTrigger = Random.nextInt()
     }
 
-    @SuppressLint("SuspiciousIndentation")
     suspend fun startSimulation() = withContext(Dispatchers.IO) {
         if (isSimRunning) return@withContext
 
@@ -188,37 +187,20 @@ class CodingRepository {
             if (!isSimRunning) return@repeat
 
 
-//            // Works, but requires the force update hack
-//            // - very fast but AnimateVerticalGrid is choppy (unless `delay` is added)
-//            // - Works with `LazyVerticalGrid`, `LazyColumn`, `AnimatedVerticalGrid`
             data.forEach { coding ->
                 coding.share += coding.trend
                 coding.trend = abs(Random.nextInt()) % 50
             }
 
-            // force update hack - Must use try/catch blocks and itemKeys.size guards in AnimatedVerticalGrid.kt
+            // Update the values in the items in the UI
             counter2++
             if (counter2 > 500) {
                 counter2 = 0
 
-//                data.forEachIndexed { index, coding ->
-//                    coding.forceUpdateId = index
-//                }
-
-//                val itr = data.listIterator()
-//                while (itr.hasNext()) {
-//                    val coding = itr.next()
-//                    itr.set(
-//                        coding.copy(
-//                            forceUpdateId = abs(Random.nextInt())
-//                        )
-//                    )
-//                }
-
                 updateValuesTrigger = Random.nextInt()
             }
 
-            // For `AnimatedVerticalGrid` - fast but counters are not updated fast
+            // Update the sort order in the UI
             counter++
             if (counter >= 100_000 / 5) {
                 counter = 0
@@ -228,18 +210,20 @@ class CodingRepository {
 
         }
 
-        val itr = data.listIterator()
-        while (itr.hasNext()) {
-            val coding = itr.next()
-            itr.set(
-                coding.copy(
-                    forceUpdateId = abs(Random.nextInt())
-                )
-            )
-        }
+//        val itr = data.listIterator()
+//        while (itr.hasNext()) {
+//            val coding = itr.next()
+//            itr.set(
+//                coding.copy(
+//                    forceUpdateId = abs(Random.nextInt())
+//                )
+//            )
+//        }
 
+        updateValuesTrigger = Random.nextInt()
         updateSortTrigger = Random.nextInt()
 
+        // Show final data in log
         val sorted = data
             .sortedBy {
                 it.share

@@ -59,29 +59,6 @@ class MainActivity : ComponentActivity() {
 
                 // Update just the `share` value
                 LaunchedEffect(updateValuesTriggerState.value) {
-                    // Create a "snapshotFlow" : Convert a hot value to a flow
-//                    snapshotFlow { uiState.value.data }
-//                        .mapNotNull {
-//                            it
-//                        }
-//                        .collect { codings ->
-//                            try {
-//                                println("snapshotFlow collecting...")
-//
-//                                itemsSorted.forEach { itemSorted ->
-//                                    codings.forEachIndexed { index, coding ->
-//                                        if (coding.id == itemSorted.id) {
-//                                            itemSorted.share = coding.share
-//                                        }
-//                                    }
-//                                }
-//                                //delay(1)
-//
-//                            } catch (e: Exception) {
-//                                println("exception size:${codings.size}, indices:${codings.indices}")
-//                                cancel()
-//                            }
-//                        }
 
                     try {
 
@@ -95,7 +72,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        // Force update
+//                        // Force update (complex) by making a copy of the list
 //                        val itr = itemsSorted.listIterator()
 //                        val newItemsSorted = mutableListOf<Coding>()
 //                        while (itr.hasNext()) {
@@ -107,7 +84,6 @@ class MainActivity : ComponentActivity() {
 //                            }
 //                        }
 
-                        // works
                         // Force update by making a copy of the list
                         val newItemsSorted = mutableListOf<Coding>()
                         itemsSorted.forEach {
