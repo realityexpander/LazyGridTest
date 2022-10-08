@@ -10,7 +10,6 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
-// IMPORTANT: Check `NOTE` below - use of synchronized may be necessary
 
 typealias ItemOffset = Animatable<DpOffset, AnimationVector2D>
 
@@ -89,7 +88,6 @@ fun <ITEM, KEY> AnimatedVerticalGrid(
             }
         } catch (e: IndexOutOfBoundsException) {
             println("IndexOutOfBoundsException for AnimatedVerticalGrid:LaunchedEffect")
-//            e.printStackTrace()
         } catch (e: Exception) {
             println("Exception: $e")
         }

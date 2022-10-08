@@ -24,6 +24,7 @@ import kotlin.random.Random
 // About SnapShotFlow
 // https://medium.com/mobile-app-development-publication/jetpack-compose-side-effects-made-easy-a4867f876928
 
+
 class ItemsViewModel(
     private val itemRepository: ItemRepository = ItemRepository()
 ) : ViewModel() {
@@ -31,8 +32,11 @@ class ItemsViewModel(
     private val _uiState = MutableStateFlow<Response<List<Item>>>(Response.Loading())
     val uiState = _uiState.asStateFlow()
 
-    private val _updateSortTriggerState = MutableStateFlow(-1)
-    val updateSortTriggerState = _updateSortTriggerState.asStateFlow()
+//    private val _updateSortTriggerState = MutableStateFlow(-1)
+//    val updateSortTriggerState = _updateSortTriggerState.asStateFlow()
+
+    private val _updateSortTriggerState = MutableSharedFlow<Boolean>()
+    val updateSortTriggerState = _updateSortTriggerState.asSharedFlow()
 
     private val _updateValuesTriggerState = MutableStateFlow(-1)
     val updateValuesTriggerState = _updateValuesTriggerState.asStateFlow()
@@ -40,30 +44,37 @@ class ItemsViewModel(
     init {
         // Update the current list of data
         viewModelScope.launch {
+            _uiState.value = Response.Loading()
+
+            delay(2000)
+
             itemRepository
-                .getItemsData()
+                .getItemsDataFlow()
                 .also {// to show inline hint about type
                 }
-                .collect { listCoding ->
-                    _uiState.value = Response.Success(listCoding)
+                .collect { items ->
+                    _uiState.value = Response.Success(items)
+                    //updateSortUI()
+                    updateSortUI2()
                 }
         }
 
         // Update the sorted list  (usually slowly)
         viewModelScope.launch {
             itemRepository
-                .onUpdateSortedTrigger()
+                .onUpdateSortedTriggerFlow()
                 .also {// to show inline hint about type
                 }
                 .collect { updateSortKey ->
-                    _updateSortTriggerState.value = updateSortKey
+                    //_updateSortTriggerState.value = updateSortKey
+                    _updateSortTriggerState.emit(true)
                 }
         }
 
         // Update just the `share` values (usually rapidly)
         viewModelScope.launch {
             itemRepository
-                .onUpdateValuesTrigger()
+                .onUpdateValuesTriggerFlow()
                 .also { // to show inline hint about type
                 }
                 .collect { updateValuesKey ->
@@ -82,6 +93,14 @@ class ItemsViewModel(
     suspend fun stopSim() = viewModelScope.launch {
         itemRepository.stopSimulation()
     }
+
+    private fun updateSortUI() {
+        //_updateSortTriggerState.value++ // = Random.nextInt()
+    }
+
+    private suspend fun updateSortUI2() {
+        _updateSortTriggerState.emit(true)
+    }
 }
 
 class ItemRepository {
@@ -99,21 +118,27 @@ class ItemRepository {
         }
 
 
-    fun getItemsData(): Flow<List<Item>> = snapshotFlow {
+    fun getItemsDataFlow(): Flow<List<Item>> = snapshotFlow {
         data
     }
 
     private var updateSortTrigger: Int by mutableStateOf(-1)
-    fun onUpdateSortedTrigger() =
+    fun onUpdateSortedTriggerFlow() =
         snapshotFlow {
             updateSortTrigger
         }
+    private fun updateSortUI() {
+        updateSortTrigger++ // = Random.nextInt()
+    }
 
     private var updateValuesTrigger by mutableStateOf(-1)
-    fun onUpdateValuesTrigger() =
+    fun onUpdateValuesTriggerFlow() =
         snapshotFlow {
             updateValuesTrigger
         }
+    private fun updateValuesUI() {
+        updateValuesTrigger++ // = Random.nextInt()
+    }
 
     fun addCoding(item: Item): Boolean {
         data.add(item)
@@ -156,10 +181,11 @@ class ItemRepository {
 
             // Update the values in the items in the UI
             counter2++
-            if (counter2 > 5) {
+            if (counter2 > 500) {
                 counter2 = 0
 
-                updateValuesTrigger = Random.nextInt()
+                //updateValuesTrigger = Random.nextInt()
+                updateValuesUI()
             }
 
             // Update the sort order in the UI
@@ -167,14 +193,17 @@ class ItemRepository {
             if (counter >= maxReps / 5) {
                 counter = 0
 
-                updateSortTrigger = Random.nextInt()
+                //updateSortTrigger = Random.nextInt()
+                updateSortUI()
             }
         }
         isSimRunning = false
 
         // Update the UI with final data
-        updateValuesTrigger = Random.nextInt()
-        updateSortTrigger = Random.nextInt()
+        //updateValuesTrigger = Random.nextInt()
+        //updateSortTrigger = Random.nextInt()
+        updateValuesUI()
+        updateSortUI()
 
 
         // Show final data in log
@@ -198,12 +227,12 @@ data class Item(
     var share: Int = 0,
     var trend: Int = 0,
     val color: Long = Random(id).nextLong(),
-    var forceUpdateId: Int = 0
+    val forceUpdateId: Int = 0
 ) {
-    constructor(item: ItemListEnum) : this(
-        item.id,
-        item.languageName,
-        item.description,
+    constructor(enumValue: ItemListEnum) : this(
+        enumValue.id,
+        enumValue.languageName,
+        enumValue.description,
         0,
         abs(Random.nextInt()) % 300,
     )
@@ -214,10 +243,22 @@ enum class ItemListEnum(
     val languageName: String,
     val description: String
 ) {
-    ANDROID(1, "Android", "Android is a mobile operating system developed by Google"),
-    IOS(2, "iOS", "iOS is a mobile operating system created and developed by Apple Inc."),
-    WEB(3, "Web", "Web development is the work involved in developing a Web site for the Internet"),
-    OTHER(4, "Other", "Other"),
+    ANDROID(
+        1,
+        "Android",
+        "Android is a mobile operating system developed by Google"),
+    IOS(
+        2,
+        "iOS",
+        "iOS is a mobile operating system created and developed by Apple Inc."),
+    WEB(
+        3,
+        "Web",
+        "Web development is the work involved in developing a Web site for the Internet"),
+    OTHER(
+        4,
+        "Other",
+        "Other"),
     JAVA(
         5,
         "Java",

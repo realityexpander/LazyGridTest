@@ -34,27 +34,43 @@ class MainActivity : ComponentActivity() {
                 val uiState = viewModel.uiState.collectAsState()
                 val scope = rememberCoroutineScope()
 
-                val updateSortTriggerState = viewModel.updateSortTriggerState.collectAsState()
+                //val updateSortTriggerState = viewModel.updateSortTriggerState.collectAsState()
                 val updateValuesTriggerState = viewModel.updateValuesTriggerState.collectAsState()
 
                 var itemsSorted by remember { mutableStateOf(emptyList<Item>()) }
 
-                // Update the sorted list  (usually slowly)
-                LaunchedEffect(updateSortTriggerState.value) {
-                    try {
-                        itemsSorted = uiState.value.data
-                            ?.sortedBy {
-                                it.share
-                            }
-                            ?.reversed()
-                            ?: emptyList()
-                    } catch (e: Exception) {
-                        println("updateSortTriggerState sort Error: $e")
-                        cancel()
+                // Update the sorted list (usually infrequently)
+//                LaunchedEffect(updateSortTriggerState.value) {
+//                    try {
+//                        itemsSorted = uiState.value.data
+//                            ?.sortedBy {
+//                                it.share
+//                            }
+//                            ?.reversed()
+//                            ?: emptyList()
+//                    } catch (e: Exception) {
+//                        println("updateSortTriggerState sort Error: $e")
+//                        cancel()
+//                    }
+//                }
+
+                LaunchedEffect(Unit) {
+                    viewModel.updateSortTriggerState.collect {
+                        try {
+                            itemsSorted = uiState.value.data
+                                ?.sortedBy {
+                                    it.share
+                                }
+                                ?.reversed()
+                                ?: emptyList()
+                        } catch (e: Exception) {
+                            println("updateSortTriggerState sort Error: $e")
+                            cancel()
+                        }
                     }
                 }
 
-                // Update just the `share` values (usually rapidly)
+                // Update just the `share` values (usually often)
                 LaunchedEffect(updateValuesTriggerState.value) {
                     try {
                         // Update the `share` values for each item in the list from the latest data
@@ -79,7 +95,6 @@ class MainActivity : ComponentActivity() {
                         println("updateValuesTriggerState exception " +
                                 "size:${uiState.value.data?.size}, " +
                                 "indices:${uiState.value.data?.indices}")
-                        cancel()
                     }
                 }
 
@@ -172,6 +187,14 @@ class MainActivity : ComponentActivity() {
                                 .background(Color.White)
                                 .padding(4.dp)
                         ) {
+
+                            if(uiState.value is Response.Loading) {
+                                Text(text = "Loading...")
+                            }
+                            if(uiState.value is Response.Error) {
+                                Text(text = "Error: ${(uiState.value as Response.Error).error?.message}")
+                            }
+
                             AnimatedVerticalGrid(
                                 items = itemsSorted,
                                 itemKey = Item::id,
