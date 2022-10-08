@@ -22,6 +22,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.random.Random
 
 class MainActivity : ComponentActivity() {
 
@@ -34,46 +36,15 @@ class MainActivity : ComponentActivity() {
                 val uiState = viewModel.uiState.collectAsState()
                 val scope = rememberCoroutineScope()
 
-                val updateSortState = viewModel.updateSortTriggerState.collectAsState()
-                val updateValuesState = viewModel.updateValuesTriggerState.collectAsState()
+                val updateSortTriggerState = viewModel.updateSortTriggerState.collectAsState()
+                val updateValuesTriggerState = viewModel.updateValuesTriggerState.collectAsState()
 
-                // Sort the list in the UI
                 var itemsSorted by remember { mutableStateOf(emptyList<Coding>()) }
-//                var itemsSorted = uiState.value.data
-//                    ?.map {
-//                        it
-//                    }
-////                    ?.map { it.copy() }
-//                    ?.sortedBy {
-//                        it.share
-//                    }
-//                    ?.reversed()
-//                    ?: emptyList()
-
-//                val sorted = try {
-//                    uiState.value.data
-//                        ?.sortedBy {
-//                            it.share
-//                        }
-//                        ?.reversed()
-//                        ?.subList(0, 10)
-//                        ?.joinToString { it.name + "->" + it.share }
-//                } catch (e: Exception) {
-//                    println("Sorted exception: $e")
-//                }
-//                println("final data (activity): $sorted")
 
                 // Update for sorted list
-//                LaunchedEffect(key1 = uiState.value.data?.get(0)?.forceUpdateId) {
-                LaunchedEffect(updateSortState.value) {
-
-                    //if(uiState.value.data?.get(0)?.forceUpdateId == 0) return@LaunchedEffect
-
-                    //println("LaunchedEffect forceUpdateId: ${uiState.value.data?.get(0)?.forceUpdateId}")
-
+                LaunchedEffect(updateSortTriggerState.value) {
+                        println("updateSortTriggerState collecting...")
                         try {
-                            println("LaunchedEffect collecting...")
-
                             itemsSorted = uiState.value.data
                                 ?.sortedBy {
                                     it.share
@@ -83,54 +54,73 @@ class MainActivity : ComponentActivity() {
                         } catch (e: Exception) {
                             println("LaunchedEffect sort Error: $e")
                             cancel()
-                        } finally {
-                            println("LaunchedEffect sort complete")
                         }
                 }
 
                 // Update just the `share` value
-//                LaunchedEffect(key1 = true) {
-                //LaunchedEffect(key1 = uiState.value.data?.get(1)?.forceUpdateId) {
-                LaunchedEffect(updateValuesState.value) {
+                LaunchedEffect(updateValuesTriggerState.value) {
                     // Create a "snapshotFlow" : Convert a hot value to a flow
-                    snapshotFlow { uiState.value.data }
-                        .mapNotNull {
-                            it
-                        }
-                        .collect { codings ->
-                            println("snapshotFlow collecting...")
-                            try {
-//                                for (index in codings.indices) {
-//                                    if (codings.indices.last >= codings.size) {
-//                                        break
-//                                        //return@collect
+//                    snapshotFlow { uiState.value.data }
+//                        .mapNotNull {
+//                            it
+//                        }
+//                        .collect { codings ->
+//                            try {
+//                                println("snapshotFlow collecting...")
+//
+//                                itemsSorted.forEach { itemSorted ->
+//                                    codings.forEachIndexed { index, coding ->
+//                                        if (coding.id == itemSorted.id) {
+//                                            itemSorted.share = coding.share
+//                                        }
 //                                    }
-//                                    val coding = codings[index]
-//                                    //println("coding $index: ${coding.name}")
 //                                }
+//                                //delay(1)
+//
+//                            } catch (e: Exception) {
+//                                println("exception size:${codings.size}, indices:${codings.indices}")
+//                                cancel()
+//                            }
+//                        }
 
-//                                itemsSorted = codings
-//                                    .sortedBy {
-//                                        it.share
-//                                    }
-//                                    .reversed()
+                    try {
 
-                                itemsSorted.forEach { itemSorted ->
-                                    codings.forEachIndexed { index, coding ->
-                                        if (coding.id == itemSorted.id) {
-                                            itemSorted.share = coding.share
-                                        }
-                                    }
+                        // Update the `share` value for each item in the list from the latest data
+                        itemsSorted.forEach { itemSorted ->
+                            uiState.value.data?.forEach { coding ->
+                                if (coding.id == itemSorted.id) {
+                                    itemSorted.share = coding.share
+                                    //itemSorted.forceUpdateId = Random.nextInt()
                                 }
-
-                                //delay(100)
-                                delay(1)
-
-                            } catch (e: Exception) {
-                                println("exception size:${codings.size}, indices:${codings.indices}")
-                                cancel()
                             }
                         }
+
+                        // Force update
+//                        val itr = itemsSorted.listIterator()
+//                        val newItemsSorted = mutableListOf<Coding>()
+//                        while (itr.hasNext()) {
+//                            val coding = itr.next()
+//                            itr.also {
+//                                newItemsSorted += coding.copy(
+//                                    forceUpdateId = abs(Random.nextInt())
+//                                )
+//                            }
+//                        }
+
+                        // works
+                        // Force update by making a copy of the list
+                        val newItemsSorted = mutableListOf<Coding>()
+                        itemsSorted.forEach {
+                            newItemsSorted += it.copy(
+                                forceUpdateId = abs(Random.nextInt())
+                            )
+                        }
+                        itemsSorted = newItemsSorted
+
+                    } catch (e: Exception) {
+                        println("exception size:${uiState.value.data?.size}, indices:${uiState.value.data?.indices}")
+                        cancel()
+                    }
                 }
 
                 // A surface container using the 'background' color from the theme

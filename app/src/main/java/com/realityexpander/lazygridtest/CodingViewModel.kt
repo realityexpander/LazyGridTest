@@ -135,45 +135,23 @@ class CodingRepository {
 
 
     fun getCodingData(): Flow<List<Coding>> = snapshotFlow {
-
-//        // works
-//        var list: ArrayList<Coding>
-//        synchronized(data) {
-//            list = ArrayList(data.toList())
-//        }
-//        list
-
-
-//        // works
-//        val data2 = CopyOnWriteArrayList<Coding>()
-//        synchronized(data) {
-//            data.forEach(data2::add)
-//        }
-//        data2
-
-
-//        // works and simplest, without using CopyOnWriteArrayList
-//        synchronized(data) {  // needed for AnimatedVerticalGrid if using "force update Hack" & CopyOnWriteArrayList
-//            data.toList()
-//        }
-
         data
     }
 
-    private var updateSortKey: Int by mutableStateOf(-1)
+    private var updateSortTrigger: Int by mutableStateOf(-1)
     fun getUpdateSortedTrigger() =
         snapshotFlow {
-            println("getUpdateSortedKey() called")
+            //println("getUpdateSortedKey() called")
 
-            updateSortKey
+            updateSortTrigger
         }
 
-    private var updateValuesKey by mutableStateOf(-1)
+    private var updateValuesTrigger by mutableStateOf(-1)
     fun getUpdateValuesTrigger() =
         snapshotFlow {
-            println("getUpdateValuesKey() called")
+            //println("getUpdateValuesKey() called")
 
-            updateValuesKey
+            updateValuesTrigger
         }
 
     fun addCoding(coding: Coding): Boolean {
@@ -195,20 +173,7 @@ class CodingRepository {
             it.trend = abs(Random.nextInt()) % 50
         }
 
-//        data.add(data.removeAt(0)) // force update hack
-//        data[0] = data[0].copy(forceUpdateId = abs(Random.nextInt())) // force launchedEffect update
-
-        val itr = data.listIterator()
-        while (itr.hasNext()) {
-            val coding = itr.next()
-            itr.set(
-                coding.copy(
-                    forceUpdateId = abs(Random.nextInt())
-                )
-            )
-        }
-
-        updateSortKey = Random.nextInt()
+        updateSortTrigger = Random.nextInt()
     }
 
     @SuppressLint("SuspiciousIndentation")
@@ -222,62 +187,6 @@ class CodingRepository {
 
             if (!isSimRunning) return@repeat
 
-            ///////////// DOESN'T WORK /////////////
-
-//            // Causes ConcurrentModificationException (cant use forEachIndexed)
-//            synchronized(data) {
-//                data.forEachIndexed { index, coding ->
-//                    data[index] = coding.copy(
-//                        share = coding.share + coding.trend,
-//                        trend = abs(Random.nextInt()) % 300
-//                    )
-//                }
-//            }
-
-//            // Causes ConcurrentModificationException (cant use forEach)
-//            synchronized(data) {
-//                data.forEach { coding ->
-//                    data.remove(coding)
-//                    data.add(coding.copy(
-//                        share = coding.share + coding.trend,
-//                        trend = abs(Random.nextInt()) % 300
-//                    ))
-//                }
-//            }
-
-
-//            // Does NOT update the UI (requires an update function, below)
-//            data[0] = data[0].copy(share = data[0].share)
-
-//              // Simply modifying the items Does NOT update the UI
-//              data[index].share = data[index].share + data[index].trend
-//              data[index].trend = data[index].trend + abs(Random.nextInt()) % 50
-
-
-//            // Causes ConcurrentModificationException & requires `synchronized`, requires Build VERSION_CODE N
-//            synchronized(data) {
-//                data.replaceAll {
-//                    it.copy(
-//                        share = it.share + it.trend,
-//                        trend = it.trend + abs(Random.nextInt()) % 50
-//                    )
-//                }
-//            }
-
-//            // using iterator - remove & add, even w/ `synchronized`, causes CME
-//            synchronized(data) {
-//                val iterator = data.iterator()
-//                while (iterator.hasNext()) {
-//                    val coding = iterator.next()
-//                    iterator.remove()
-//                    data.add(coding.copy(
-//                        share = coding.share + coding.trend,
-//                        trend = coding.trend + abs(Random.nextInt()) % 50
-//                    ))
-//                }
-//            }
-
-            //////////////// WORKS ///////////////////////
 
 //            // Works, but requires the force update hack
 //            // - very fast but AnimateVerticalGrid is choppy (unless `delay` is added)
@@ -289,99 +198,35 @@ class CodingRepository {
 
             // force update hack - Must use try/catch blocks and itemKeys.size guards in AnimatedVerticalGrid.kt
             counter2++
-            if (counter2 > 1000) {
+            if (counter2 > 500) {
                 counter2 = 0
 
-//                // Force update of set
+//                data.forEachIndexed { index, coding ->
+//                    coding.forceUpdateId = index
+//                }
+
 //                val itr = data.listIterator()
 //                while (itr.hasNext()) {
 //                    val coding = itr.next()
 //                    itr.set(
 //                        coding.copy(
-//                            share = coding.share,
+//                            forceUpdateId = abs(Random.nextInt())
 //                        )
 //                    )
 //                }
-//                val removedElement = data.removeAt(0)
-//                data.add(removedElement.apply { forceUpdateId = removedElement.forceUpdateId }) // force list update
 
-//                data.add(data.removeAt(0).apply{ forceUpdateId = Random.nextInt() }) // force update hack
-
-//                data.add(data.removeAt(0)) // force list update
-
-                updateValuesKey = Random.nextInt()
-
+                updateValuesTrigger = Random.nextInt()
             }
-//            data[0] = data[0].copy(forceUpdateId = abs(Random.nextInt())) // force launchedEffect update
-
-//            // For `AnimatedVerticalGrid` only - works, but slow
-//            if (it % 10000 == 0) {
-//                delay(1000) // give time to the animation
-//            }
 
             // For `AnimatedVerticalGrid` - fast but counters are not updated fast
             counter++
-            if (counter >= 15000) {
+            if (counter >= 100_000 / 5) {
                 counter = 0
-//                data.add(data.removeAt(0)) // force list update
-//                data[0] = data[0].copy(forceUpdateId = abs(Random.nextInt())) // force launchedEffect sorting
 
-                updateSortKey = Random.nextInt()
+                updateSortTrigger = Random.nextInt()
             }
 
-
-            /////////////////////////////////////////////////////////////
-
-//            // Works well
-//            // - doesn't need `synchronized` on `AnimatedVerticalGrid`, `LazyVerticalGrid`
-//            // - Does need `synchronized` for `LazyColumn`
-//            // - Slower than the hack version above
-//            //synchronized(data) { // needed for `LazyColumn` for `AnimatedItemPlacement`
-//                val itr = data.listIterator()
-//                while (itr.hasNext()) {
-//                    val coding = itr.next()
-//                    itr.set(
-//                        coding.copy(
-//                            share = coding.share + coding.trend,
-//                            trend = coding.trend + abs(Random.nextInt()) % 50
-//                        )
-//                    )
-//                }
-//            //}
-
-            /////////////////////////////////////////////////////////////
-
-//            // Works well - doesn't need `synchronized` on `AnimatedVerticalGrid`, `LazyVerticalGrid`
-//            // - Does need `synchronized` for `LazyColumn`
-//            // - Slower than the hack version above
-//            synchronized(data) { // needed for `LazyColumn` for `AnimatedItemPlacement`
-//                for (index in data.indices) {
-//                    data[index] = with(data[index]) {
-//                        val randomInt = abs(Random.nextInt()) % 10
-//                        copy(
-//                            share = share + trend,
-//                            trend = trend + randomInt
-//                        )
-//                    }
-//
-//                }
-//            }
-
-
-//            delay(Random.nextLong(10, 500))
-
-//            println("data: ${
-//                data
-//                    .sortedBy { it.share }
-//                    .reversed()
-//                    .subList(0, 10)
-//                    .joinToString { it.name + "->" + it.share }
-//            }")
         }
-
-//        data[0] = data[0].copy(share = data[0].share + 1, trend = 0)
-//        data.add(data.removeAt(0))
-        //data[0] = data[0].copy(forceUpdateId = abs(Random.nextInt()))
 
         val itr = data.listIterator()
         while (itr.hasNext()) {
@@ -393,7 +238,7 @@ class CodingRepository {
             )
         }
 
-        updateSortKey = Random.nextInt()
+        updateSortTrigger = Random.nextInt()
 
         val sorted = data
             .sortedBy {
