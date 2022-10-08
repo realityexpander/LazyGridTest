@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -17,48 +16,119 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.DpOffset
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.toColor
-import androidx.core.graphics.toColorLong
 import com.realityexpander.lazygridtest.ui.theme.LazyGridTestTheme
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
     @OptIn(ExperimentalFoundationApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             LazyGridTestTheme {
                 val viewModel by viewModels<CodingViewModel>()
-
                 val uiState = viewModel.uiState.collectAsState()
-
                 val scope = rememberCoroutineScope()
 
+                val updateSortState = viewModel.updateSortTriggerState.collectAsState()
+                val updateValuesState = viewModel.updateValuesTriggerState.collectAsState()
 
                 // Sort the list in the UI
-                val itemsSorted = uiState.value.data
-                    ?.map { it } //.copy() }
-                    ?.sortedBy {
-                        it.share
-                    }
-                    ?.reversed()
-                    ?: emptyList()
+                var itemsSorted by remember { mutableStateOf(emptyList<Coding>()) }
+//                var itemsSorted = uiState.value.data
+//                    ?.map {
+//                        it
+//                    }
+////                    ?.map { it.copy() }
+//                    ?.sortedBy {
+//                        it.share
+//                    }
+//                    ?.reversed()
+//                    ?: emptyList()
 
+//                val sorted = try {
+//                    uiState.value.data
+//                        ?.sortedBy {
+//                            it.share
+//                        }
+//                        ?.reversed()
+//                        ?.subList(0, 10)
+//                        ?.joinToString { it.name + "->" + it.share }
+//                } catch (e: Exception) {
+//                    println("Sorted exception: $e")
+//                }
+//                println("final data (activity): $sorted")
 
-                // Testing snapshotFlow (allows use of flow operators)
-                LaunchedEffect(key1 = uiState) {
-                    println("LaunchedEffect")
+                // Update for sorted list
+//                LaunchedEffect(key1 = uiState.value.data?.get(0)?.forceUpdateId) {
+                LaunchedEffect(updateSortState.value) {
 
-                    // Create a flow from a Compose State
-                    snapshotFlow { uiState }
-                        .mapNotNull { it.value.data }
-                        .collect {
-                            it.forEach { item ->
-                                println("snapshotFlow item: ${item.name}")
+                    //if(uiState.value.data?.get(0)?.forceUpdateId == 0) return@LaunchedEffect
+
+                    //println("LaunchedEffect forceUpdateId: ${uiState.value.data?.get(0)?.forceUpdateId}")
+
+                        try {
+                            println("LaunchedEffect collecting...")
+
+                            itemsSorted = uiState.value.data
+                                ?.sortedBy {
+                                    it.share
+                                }
+                                ?.reversed()
+                                ?: emptyList()
+                        } catch (e: Exception) {
+                            println("LaunchedEffect sort Error: $e")
+                            cancel()
+                        } finally {
+                            println("LaunchedEffect sort complete")
+                        }
+                }
+
+                // Update just the `share` value
+//                LaunchedEffect(key1 = true) {
+                //LaunchedEffect(key1 = uiState.value.data?.get(1)?.forceUpdateId) {
+                LaunchedEffect(updateValuesState.value) {
+                    // Create a "snapshotFlow" : Convert a hot value to a flow
+                    snapshotFlow { uiState.value.data }
+                        .mapNotNull {
+                            it
+                        }
+                        .collect { codings ->
+                            println("snapshotFlow collecting...")
+                            try {
+//                                for (index in codings.indices) {
+//                                    if (codings.indices.last >= codings.size) {
+//                                        break
+//                                        //return@collect
+//                                    }
+//                                    val coding = codings[index]
+//                                    //println("coding $index: ${coding.name}")
+//                                }
+
+//                                itemsSorted = codings
+//                                    .sortedBy {
+//                                        it.share
+//                                    }
+//                                    .reversed()
+
+                                itemsSorted.forEach { itemSorted ->
+                                    codings.forEachIndexed { index, coding ->
+                                        if (coding.id == itemSorted.id) {
+                                            itemSorted.share = coding.share
+                                        }
+                                    }
+                                }
+
+                                //delay(100)
+                                delay(1)
+
+                            } catch (e: Exception) {
+                                println("exception size:${codings.size}, indices:${codings.indices}")
+                                cancel()
                             }
                         }
                 }
@@ -68,44 +138,47 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-
                     // LazyVerticalGrid
                     if (false) {
-                        LazyVerticalGrid(
-                            cells = GridCells.Fixed(2),
-                        ) {
-                            items(itemsSorted) { item ->
-                                Row {
-                                    Text(
-                                        text = item.name + ":" + item.share,
-                                        modifier = Modifier.animateItemPlacement(),
-                                        color = MaterialTheme.colors.onBackground
-                                    )
+                        Column {
+                            LazyVerticalGrid(
+                                cells = GridCells.Fixed(2),
+                            ) {
+                                items(itemsSorted) { item ->
+                                    Row {
+                                        Text(
+                                            text = item.name + ":" + item.share,
+                                            color = Color.Black,
+                                            modifier = Modifier
+                                                .background(color = Color(item.color))
+                                                .padding(8.dp)
+                                                .animateItemPlacement() // currently ignored
+                                        )
+                                    }
                                 }
                             }
-                            item {
-                                Button(onClick = {
-                                    scope.launch {
-                                        viewModel.startSim()
-                                    }
-                                }) {
-                                    Text(text = "Start Sim")
-                                }
 
-                                Button(onClick = {
-                                    scope.launch {
-                                        viewModel.stopSim()
-                                    }
-                                }) {
-                                    Text(text = "Stop Sim")
+                            Button(onClick = {
+                                scope.launch {
+                                    viewModel.startSim()
                                 }
+                            }) {
+                                Text(text = "Start Sim")
+                            }
+
+                            Button(onClick = {
+                                scope.launch {
+                                    viewModel.stopSim()
+                                }
+                            }) {
+                                Text(text = "Stop Sim")
                             }
                         }
                     }
 
 
                     // LazyColumn
-                    if (true) {
+                    if (false) {
                         LazyColumn() {
                             items(
                                 itemsSorted,
@@ -114,8 +187,11 @@ class MainActivity : ComponentActivity() {
                             ) { item ->
                                 Text(
                                     text = item.name + ":" + item.share,
-                                    modifier = Modifier.animateItemPlacement(),
-                                    color = MaterialTheme.colors.onBackground
+                                    color = Color.Black,
+                                    modifier = Modifier
+                                        .background(color = Color(item.color))
+                                        .padding(8.dp)
+                                        .animateItemPlacement()
                                 )
                             }
 
@@ -139,12 +215,13 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+
                     // AnimatedVerticalGrid
-                    if (false) {
+                    if (true) {
                         Column(
                             modifier = Modifier
-                                .fillMaxSize()
                                 .background(Color.White)
+                                .padding(4.dp)
                         ) {
                             AnimatedVerticalGrid(
                                 items = itemsSorted,
@@ -153,11 +230,11 @@ class MainActivity : ComponentActivity() {
                                 rows = itemsSorted.size / 2,
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .padding(1.dp)
                                     .weight(1F)
                             ) { item ->
-                                //Coding(it.id)
                                 Text(
-                                    text = item.name + ":" + item.share,
+                                    text = item.name + ":" + item.share.toString(),
                                     color = Color.Black,
                                     modifier = Modifier
                                         .background(color = Color(item.color))

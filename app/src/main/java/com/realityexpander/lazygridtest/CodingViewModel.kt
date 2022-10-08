@@ -1,16 +1,11 @@
 package com.realityexpander.lazygridtest
 
 import android.annotation.SuppressLint
-import android.os.Build
-import androidx.annotation.RequiresApi
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import java.util.*
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.abs
 import kotlin.random.Random
@@ -39,19 +34,41 @@ class CodingViewModel(
     private val _uiState = MutableStateFlow<Response<List<Coding>>>(Response.Loading())
     val uiState = _uiState.asStateFlow()
 
+    private val _updateSortTriggerState = MutableStateFlow(-1)
+    val updateSortTriggerState = _updateSortTriggerState.asStateFlow()
+
+    private val _updateValuesTriggerState = MutableStateFlow(-1)
+    val updateValuesTriggerState = _updateValuesTriggerState.asStateFlow()
+
     init {
         viewModelScope.launch {
-            codingRepository.getCoding().collect { listCoding ->
+            codingRepository
+                .getCodingData()
+                .also {
+                }
+                .collect { listCoding ->
+                    _uiState.value = Response.Success(listCoding)
+                }
+        }
 
-//                 // Sort the list in the viewModel vs in the UI
-//                 _uiState.value = Response.Success(
-//                     listCoding.sortedBy { it.share }.reversed()
-//                 )
+        viewModelScope.launch {
+            codingRepository
+                .getUpdateSortedTrigger()
+                .also {
+                }
+                .collect { updateSortKey ->
+                    _updateSortTriggerState.value = updateSortKey
+                }
+        }
 
-                _uiState.value = Response.Success(
-                    listCoding
-                )
-            }
+        viewModelScope.launch {
+            codingRepository
+                .getUpdateValuesTrigger()
+                .also {
+                }
+                .collect { updateValuesKey ->
+                    _updateValuesTriggerState.value = updateValuesKey
+                }
         }
     }
 
@@ -69,23 +86,55 @@ class CodingViewModel(
 class CodingRepository {
     private var isSimRunning: Boolean = false
 
-    private val data: SnapshotStateList<Coding> = CodingType.values()
+    // Using CopyOnWriteArrayList to avoid ConcurrentModificationException
+    private val codingsWithCopyOnWriteArrayList = CopyOnWriteArrayList(
+        CodingType.values().map {
+            Coding(it, forceUpdateId = -1)
+        }
+    )
+
+    // Using regular ArrayList (must use `synchronized` to avoid ConcurrentModificationException)
+    private val codingsRegularArray = ArrayList(
+        CodingType.values().map {
+            Coding(it, forceUpdateId = -1)
+        }
+    )
+
+    // Using regular array/list must use `synchronized` or `withLock`
+    private val dataWithoutCopyOnWrite = CodingType.values()
+//    private val data = CodingType.values()
         .map {
             // `with` changes `it` to `this`
             with(it) {
                 Coding(
                     it.id,
-                    languageName,
-                    description,
+                    this.languageName,
+                    this.description,
                     0,
                     abs(Random.nextInt()) % 300
                 )
             }
         }
         .toMutableStateList()
-        .also {} // to show inline hint about type
+        .also {// to show inline hint about type
+        }
 
-    fun getCoding(): Flow<List<Coding>> = snapshotFlow {
+    // Using CopyOnWriteArrayList - removes the need to use `synchronized` or `withLock`
+    private val dataUsingCopyOnWriteArrayList = codingsWithCopyOnWriteArrayList
+//    private val data = codingsWithCopyOnWriteArrayList
+        .toMutableStateList()
+        .also {// to show inline hint about type
+        }
+
+    // Using RegularArray
+    private val dataRegularArray = codingsRegularArray
+    private val data = codingsRegularArray
+        .toMutableStateList()
+        .also {// to show inline hint about type
+        }
+
+
+    fun getCodingData(): Flow<List<Coding>> = snapshotFlow {
 
 //        // works
 //        var list: ArrayList<Coding>
@@ -103,11 +152,29 @@ class CodingRepository {
 //        data2
 
 
-        // works and simplest
-        synchronized(data) {
-            data.toList()
-        }
+//        // works and simplest, without using CopyOnWriteArrayList
+//        synchronized(data) {  // needed for AnimatedVerticalGrid if using "force update Hack" & CopyOnWriteArrayList
+//            data.toList()
+//        }
+
+        data
     }
+
+    private var updateSortKey: Int by mutableStateOf(-1)
+    fun getUpdateSortedTrigger() =
+        snapshotFlow {
+            println("getUpdateSortedKey() called")
+
+            updateSortKey
+        }
+
+    private var updateValuesKey by mutableStateOf(-1)
+    fun getUpdateValuesTrigger() =
+        snapshotFlow {
+            println("getUpdateValuesKey() called")
+
+            updateValuesKey
+        }
 
     fun addCoding(coding: Coding): Boolean {
         data.add(coding)
@@ -121,6 +188,27 @@ class CodingRepository {
 
     suspend fun stopSimulation() {
         isSimRunning = false
+
+        // Reset the simulation to zero with new values
+        data.forEach {
+            it.share = 0
+            it.trend = abs(Random.nextInt()) % 50
+        }
+
+//        data.add(data.removeAt(0)) // force update hack
+//        data[0] = data[0].copy(forceUpdateId = abs(Random.nextInt())) // force launchedEffect update
+
+        val itr = data.listIterator()
+        while (itr.hasNext()) {
+            val coding = itr.next()
+            itr.set(
+                coding.copy(
+                    forceUpdateId = abs(Random.nextInt())
+                )
+            )
+        }
+
+        updateSortKey = Random.nextInt()
     }
 
     @SuppressLint("SuspiciousIndentation")
@@ -128,11 +216,13 @@ class CodingRepository {
         if (isSimRunning) return@withContext
 
         isSimRunning = true
-        repeat(100000) {
+        var counter = 0
+        var counter2 = 0
+        repeat(100_000) {
 
             if (!isSimRunning) return@repeat
 
-            ///////////// DOESNT WORK /////////////
+            ///////////// DOESN'T WORK /////////////
 
 //            // Causes ConcurrentModificationException (cant use forEachIndexed)
 //            synchronized(data) {
@@ -190,20 +280,63 @@ class CodingRepository {
             //////////////// WORKS ///////////////////////
 
 //            // Works, but requires the force update hack
-//            // Doesn't need `synchronized` for `AnimatedVerticalGrid`, `LazyColumn`
-//            synchronized(data) { // needed for LazyVerticalGrid
-                data.forEach { coding ->
-                    coding.share += coding.trend
-                    coding.trend = abs(Random.nextInt()) % 50
-                }
+//            // - very fast but AnimateVerticalGrid is choppy (unless `delay` is added)
+//            // - Works with `LazyVerticalGrid`, `LazyColumn`, `AnimatedVerticalGrid`
+            data.forEach { coding ->
+                coding.share += coding.trend
+                coding.trend = abs(Random.nextInt()) % 50
+            }
 
-                // forces update
-                data.add(data.removeAt(0))
+            // force update hack - Must use try/catch blocks and itemKeys.size guards in AnimatedVerticalGrid.kt
+            counter2++
+            if (counter2 > 1000) {
+                counter2 = 0
+
+//                // Force update of set
+//                val itr = data.listIterator()
+//                while (itr.hasNext()) {
+//                    val coding = itr.next()
+//                    itr.set(
+//                        coding.copy(
+//                            share = coding.share,
+//                        )
+//                    )
+//                }
+//                val removedElement = data.removeAt(0)
+//                data.add(removedElement.apply { forceUpdateId = removedElement.forceUpdateId }) // force list update
+
+//                data.add(data.removeAt(0).apply{ forceUpdateId = Random.nextInt() }) // force update hack
+
+//                data.add(data.removeAt(0)) // force list update
+
+                updateValuesKey = Random.nextInt()
+
+            }
+//            data[0] = data[0].copy(forceUpdateId = abs(Random.nextInt())) // force launchedEffect update
+
+//            // For `AnimatedVerticalGrid` only - works, but slow
+//            if (it % 10000 == 0) {
+//                delay(1000) // give time to the animation
 //            }
 
+            // For `AnimatedVerticalGrid` - fast but counters are not updated fast
+            counter++
+            if (counter >= 15000) {
+                counter = 0
+//                data.add(data.removeAt(0)) // force list update
+//                data[0] = data[0].copy(forceUpdateId = abs(Random.nextInt())) // force launchedEffect sorting
 
-//            // Works well - doesn't need `synchronized` on `AnimatedVerticalGrid`, `LazyVerticalGrid`
-//            //synchronized(data) { // needed for `LazyColumn` with `AnimatedItemPlacement`
+                updateSortKey = Random.nextInt()
+            }
+
+
+            /////////////////////////////////////////////////////////////
+
+//            // Works well
+//            // - doesn't need `synchronized` on `AnimatedVerticalGrid`, `LazyVerticalGrid`
+//            // - Does need `synchronized` for `LazyColumn`
+//            // - Slower than the hack version above
+//            //synchronized(data) { // needed for `LazyColumn` for `AnimatedItemPlacement`
 //                val itr = data.listIterator()
 //                while (itr.hasNext()) {
 //                    val coding = itr.next()
@@ -216,9 +349,12 @@ class CodingRepository {
 //                }
 //            //}
 
+            /////////////////////////////////////////////////////////////
 
-//            // works well - doesn't need `synchronized` on `AnimatedVerticalGrid`, `LazyVerticalGrid`
-//            synchronized(data) { // needed for `LazyColumn` with `AnimatedItemPlacement`
+//            // Works well - doesn't need `synchronized` on `AnimatedVerticalGrid`, `LazyVerticalGrid`
+//            // - Does need `synchronized` for `LazyColumn`
+//            // - Slower than the hack version above
+//            synchronized(data) { // needed for `LazyColumn` for `AnimatedItemPlacement`
 //                for (index in data.indices) {
 //                    data[index] = with(data[index]) {
 //                        val randomInt = abs(Random.nextInt()) % 10
@@ -232,16 +368,41 @@ class CodingRepository {
 //            }
 
 
-            delay(Random.nextLong(10, 500))
+//            delay(Random.nextLong(10, 500))
 
-            println("data: ${
-                data
-                    .sortedBy { it.share }
-                    .reversed()
-                    .subList(0, 10)
-                    .joinToString { it.name + "->" + it.share }
-            }")
+//            println("data: ${
+//                data
+//                    .sortedBy { it.share }
+//                    .reversed()
+//                    .subList(0, 10)
+//                    .joinToString { it.name + "->" + it.share }
+//            }")
         }
+
+//        data[0] = data[0].copy(share = data[0].share + 1, trend = 0)
+//        data.add(data.removeAt(0))
+        //data[0] = data[0].copy(forceUpdateId = abs(Random.nextInt()))
+
+        val itr = data.listIterator()
+        while (itr.hasNext()) {
+            val coding = itr.next()
+            itr.set(
+                coding.copy(
+                    forceUpdateId = abs(Random.nextInt())
+                )
+            )
+        }
+
+        updateSortKey = Random.nextInt()
+
+        val sorted = data
+            .sortedBy {
+                it.share
+            }
+            .reversed()
+            .subList(0, 10)
+            .joinToString { it.name + "->" + it.share }
+        println("final data           : $sorted")
 
         isSimRunning = false
     }
@@ -254,8 +415,18 @@ data class Coding(
     val description: String = "",
     var share: Int = 0,
     var trend: Int = 0,
-    val color: Long = Random(id).nextLong()
-)
+    val color: Long = Random(id).nextLong(),
+    var forceUpdateId: Int = 0
+) {
+    constructor(codingType: CodingType, forceUpdateId: Int = 0) : this(
+        codingType.id,
+        codingType.languageName,
+        codingType.description,
+        0,
+        abs(Random.nextInt()) % 300,
+        forceUpdateId = forceUpdateId
+    )
+}
 
 enum class CodingType(
     val id: Int,

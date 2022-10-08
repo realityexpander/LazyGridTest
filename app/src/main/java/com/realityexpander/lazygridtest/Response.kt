@@ -4,11 +4,15 @@ import kotlin.random.Random
 
 sealed class Response<T: Any>(
     val data: T? = null,
-    val error: Throwable? = null
+    val error: Throwable? = null,
+    var updateSortKey: Int = 0,
+    var updateValuesKey: Int = 0
 ) {
-    class Success<T: Any>(data: T, var id:Int = Random(200).nextInt()) : Response<T>(data = data)
+    class Success<T: Any>(data: T, updateSortKey: Int = 0) : Response<T>(data = data, updateSortKey = updateSortKey)
     class Error<T: Any>(error: Throwable) : Response<T>(error = error)
     class Loading<T: Any>: Response<T>()
+    class UpdateSort<T: Any>(updateKey: Int): Response<T>(updateSortKey = updateKey)
+    class UpdateValues<T: Any>(updateKey: Int): Response<T>(updateSortKey = updateKey)
 }
 
 
