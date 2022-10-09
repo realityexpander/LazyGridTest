@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
 
                 var itemsSorted by remember { mutableStateOf(emptyList<Item>()) }
 
-                // Update the sorted list (usually infrequently)
+//                // Update the sorted list (usually infrequently) (using StateFlow)
 //                LaunchedEffect(updateSortTriggerState.value) {
 //                    try {
 //                        itemsSorted = uiState.value.data
@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
 //                    }
 //                }
 
+                // Update the sorted list (usually infrequently) (using SharedFlow)
                 LaunchedEffect(Unit) {
                     viewModel.updateSortTriggerState.collect {
                         try {
@@ -69,6 +70,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+
 
                 // Update just the `share` values (usually often)
                 LaunchedEffect(updateValuesTriggerState.value) {
